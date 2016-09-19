@@ -1,17 +1,27 @@
 #!/usr/bin/env python
 
 # Script to create an IGV session for a WGS sequencing project on dx
-# usage
-# python dx-igv-registry.py
-# python -m SimpleHTTPServer 8000
+# It creates one XML file for each DX project, and records these in a 
+# registry at ~/igvdata/$$_dataServerRegistry.txt
+# $$ is used by IGV to choose a different dataServerRegistry file depending on the active reference genome
 #
+# Usage
+# -----
+#     mkdir ~/igvdata
+#     python dx-igv-registry.py -u
+#     python -m SimpleHTTPServer 8000
+#     IGV > View > Preferences > Advanced
+#      * Data Registry URL = http://localhost:8000/igvdata/$$_dataServerRegistry.txt
+#
+# Mark Cowley, 19/9/2016
+##############################
+
 import argparse
 import glob
 import os
 from urllib import quote
 from xml.etree.ElementTree import ElementTree, Element, SubElement, tostring
 import xml.dom.minidom
-
 import dxpy
 
 
@@ -36,11 +46,11 @@ class DxProjectRegistry(object):
         self.genome = genome
         self.project = project
     
-    def addData(self, debug=False):
+    def addData(self):
         """Add all data within a DX project to this DxProjectRegistry instance, starting at top level"""
-        self.addLevel(self.Global, "/", debug=debug)
+        self.addLevel(self.Global, "/")
     
-    def addLevel(self, node, folder, debug=False):
+    def addLevel(self, node, folder):
         """
         Recurse into folders, and find all IGV-compatible files to be added to registry
         :param node: an Element, or SubElement to add items to
@@ -204,7 +214,7 @@ class IgvRegistry(object):
         new_projects = self.newProjects()
         for project in new_projects:
             dxproj = DxProjectRegistry(project=project, genome="1kg_v37", URL_DURATION=86400)
-            dxproj.addData(debug=True)
+            dxproj.addData()
             dxproj.writeXML()
             dxproj.writeRegistryTXT()
             self.projects.append(project)
@@ -228,7 +238,7 @@ class IgvRegistry(object):
             if first:
                 reg.eraseRegistryTXT()
                 first = False
-            reg.addData(debug=True)
+            reg.addData()
             reg.writeXML()
             reg.writeRegistryTXT()
 
@@ -250,10 +260,10 @@ def main(args):
         reg.testUpdate()
         import sys
         sys.exit(0)
-    #elif args.force:
-    #    reg.forceUpdate()
-    #elif args.update:
-    #    reg.updateCache()
+    elif args.force:
+        reg.forceUpdate()
+    elif args.update:
+        reg.updateCache()
 
 
 if __name__ == '__main__':
