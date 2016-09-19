@@ -5,17 +5,24 @@
 # python dx-igv-registry.py
 # python -m SimpleHTTPServer 8000
 #
-import dxpy
-from urllib import quote
 import os
-from xml.etree.ElementTree import ElementTree, Element, SubElement
-from xml.dom import minidom
+from urllib import quote
+from xml.etree.ElementTree import ElementTree, Element, SubElement, tostring
+import xml.dom.minidom
+
+import dxpy
 
 
 class DxProjectRegistry(object):
     """Represent an DX Project as an IGV registry (XML)"""
 
     def __init__(self, project, genome="1kg_v37", URL_DURATION=86400):
+        """
+        
+        :param project: 
+        :param genome: 
+        :param URL_DURATION: number of seconds for which the generated URL will be valid 
+        """
         assert isinstance(project, dxpy.DXProject)
 
         Global = Element('Global')
@@ -43,77 +50,142 @@ class DxProjectRegistry(object):
         assert folder is not None
 
         print "Adding {}:{}".format(self.project.name, folder)
-        # @TODO - how to do this with dxpy?
-        subfolders = os.popen(
-            "dx ls --folders {} | sed 's|/$||'".format(self.project.get_id() + ":" + folder)).read().splitlines()
+        subfolders = dxpy.api.project_list_folder(self.project.id, input_params={"folder": folder, "describe": {
+            "fields": {"id": True, "name": True, "class": True}}, "only": "folders", "includeHidden": False},
+                                                  always_retry=True)["folders"]
+        subfolders = [os.path.basename(subfolder) for subfolder in subfolders]
+        
         for subfolder in subfolders:
             subnode = SubElement(self.Global, "Category", name=subfolder)
             subnodepath = str(folder + "/" + subfolder).replace("//", "/")
             self.addLevel(subnode, subnodepath)
 
-        files = list(dxpy.find_data_objects(
+        dxfiles = list(dxpy.find_data_objects(
             recurse=False, folder=folder, return_handler=True, project=self.project.get_id())
         )
-        for file in files:
-            if isinstance(file, dxpy.DXFile):
-                n, ext = os.path.splitext(file.name)
-                # if ext[1:] in ("bam", "vcf", "gz", "bed"):
+        for dxfile in dxfiles:
+            if isinstance(dxfile, dxpy.DXFile):
+                n, ext = os.path.splitext(dxfile.name)
                 if ext[1:] == "bam":
-                    print "Adding {}:{}/{}".format(self.project.name, folder, file.name)
-                    # print "file_id: {}:{}".format(project.id, file.id)
+                    self.__addIndexedFile(dxfile, folder, node, ["bai"])
+                elif str(dxfile.name).endswith("vcf.gz"):
+                    self.__addIndexedFile(dxfile, folder, node, ["idx", "tbi"])
+                elif str(dxfile.name).endswith("bw"):
+                    self.__addNonIndexedFile(dxfile, folder, node)
+                elif str(dxfile.name).endswith("bed.gz"):
+                    self.__addNonIndexedFile(dxfile, folder, node)
+                elif str(dxfile.name).endswith("tdf"):
+                    self.__addNonIndexedFile(dxfile, folder, node)
 
-                    BAM_dx = file
-                    # BAM_url = BAM_dx.get_download_url(duration=self.URL_DURATION, preauthenticated=True, 
-                    # project=project.id)
-                    BAM_url = BAM_dx.get_download_url(
-                        duration=self.URL_DURATION, filename=BAM_dx.name, preauthenticated=True
-                    )
+    def __addIndexedFile(self, dxfile, folder, node, index_exts=["bai"]):
+        """
+        Add a file to XML tree, which should also have an index file
+        :param dxfile: DXFile object, point to a BAM, or VCF file
+        :param folder: folder in which to find the index file
+        :param node: Element or SubElement object
+        :param index_exts: an array of allowable file extensions of the index file. eg ['bai'], or ['idx', 'tbi']
+        :return: nothing
+        """
+        print "Adding {}:{}/{}".format(self.project.name, folder, dxfile.name)
+        assert isinstance(dxfile, dxpy.DXFile)
 
-                    bai_name = file.name + ".bai"
-                    BAI_dx = dxpy.find_one_data_object(
-                        zero_ok=False, name=bai_name, folder=folder, name_mode="exact", return_handler=True,
-                        project=self.project.get_id()
-                    )
-                    # BAI_url = BAI_dx.get_download_url(duration=self.URL_DURATION, preauthenticated=True, 
-                    # filename=bai_name, project=project.id)
-                    BAI_url = BAI_dx.get_download_url(
-                        duration=self.URL_DURATION, preauthenticated=True, filename=BAI_dx.name
-                    )
+        file_url = dxfile.get_download_url(
+            duration=self.URL_DURATION, filename=dxfile.name, preauthenticated=True
+        )
 
-                    BAM_Resource = SubElement(node, "Resource")
-                    BAM_Resource.set("name", file.name)
-                    BAM_Resource.set("path", BAM_url[0])
-                    BAM_Resource.set("index", BAI_url[0])
+        index = None
+        for index_ext in index_exts:
+            index_name = dxfile.name + "." + index_ext
+            print "Looking for index file: {}".format(index_name)
+            index = dxpy.find_one_data_object(
+                name=index_name, folder=folder, name_mode="exact",
+                project=self.project.get_id(), zero_ok=True, return_handler=True
+            )
+            if not index is None:
+                break
+        if index is None:
+            #raise dxpy.exceptions.DXSearchError("Could not find an index file for {}".format(dxfile.name))
+            #raise RuntimeWarning("Skipping {}, failed to find an index file".format(dxfile.name))
+            print "Skipping {}, failed to find an index file".format(dxfile.name)
+            return None
+        
+        indel_url = index.get_download_url(
+            duration=self.URL_DURATION, preauthenticated=True, filename=index.name
+        )
 
-                    # for debugging, just save the first BAM.
-                    if debug:
-                        break
+        resource = SubElement(node, "Resource")
+        resource.set("name", dxfile.name)
+        resource.set("path", file_url[0])
+        resource.set("index", indel_url[0])
+
+    def __addNonIndexedFile(self, dxfile, folder, node):
+        """
+        Add a file to XML tree, by generating a DX URL
+        :param dxfile: DXFile object, point to a BAM, or VCF file
+        :param folder: folder in which to find the index file
+        :param node: Element or SubElement object
+        :return: nothing
+        """
+        print "Adding {}:{}/{}".format(self.project.name, folder, dxfile.name)
+        assert isinstance(dxfile, dxpy.DXFile)
+
+        file_url = dxfile.get_download_url(
+            duration=self.URL_DURATION, filename=dxfile.name, preauthenticated=True
+        )
+
+        resource = SubElement(node, "Resource")
+        resource.set("name", dxfile.name)
+        resource.set("path", file_url[0])
 
     def getXmlName(self):
         filename = self.genome + "." + self.project.name + ".xml"
         return filename
 
+    def getRegistryName(self):
+        filename = self.genome + "_dataServerRegistry.txt"
+        return filename
+    
     def writeXML(self):
-        filename = self.getXmlName
-        ElementTree(self.Global).write(filename, encoding="utf-8", xml_declaration=True)
+        """
+        pretty print the XML tree.
+        :return: nothing
+        """
+        filename = self.getXmlName()
+        rough_string = tostring(self.Global, 'utf-8', method="xml")
+        reparsed = xml.dom.minidom.parseString(rough_string)
+        
+        with open(filename, "w") as text_file:
+            text_file.write(reparsed.toprettyxml(indent="\t", encoding='utf-8'))
+        
+        # ElementTree(self.Global).write(filename, encoding="utf-8", xml_declaration=True)
         print "'%s' successfully created!" % filename
 
-    def writeRegistryTXT(self, filename="registry.txt"):
+    def writeRegistryTXT(self):
+        filename = self.getRegistryName()
         with open(filename, "a") as myfile:
             url = quote("http://localhost:8000/" + self.getXmlName(), safe="%/:=&?~#+!$,;'@()*[]")
-            myfile.writelines(url)
+            myfile.write(url + "\n")
+
+    def eraseRegistryTXT(self):
+        filename = self.getRegistryName()
+        if os.path.exists(filename):
+            os.unlink(filename)
 
 
 def test():
-    ##### TEST
-    os.unlink("registry.txt")
-    project_ids = (u'project-Bz6GbkQ0VGPv0fpqZZ6ZZGfx', u'project-Bb9KVk8029vp1qzXz4yx4xB3')
+    """Run a subset of projects"""
+    first = True
+    #project_ids = (u'project-BzPb25j0627bFJv6q9g81ZX5', u'project-Bz6GbkQ0VGPv0fpqZZ6ZZGfx', u'project-Bb9KVk8029vp1qzXz4yx4xB3')
+    project_ids = (u'project-BzPb25j0627bFJv6q9g81ZX5', u'project-Bb9KVk8029vp1qzXz4yx4xB3')
     for project_id in project_ids:
         project = dxpy.DXProject(project_id)
-        reg = DxProjectRegistry(project=project, genome="1kg_v37", URL_DURATION=86400)
+        reg = DxProjectRegistry(project=project, genome="1kg_v37", URL_DURATION=60*24)
+        if first:
+            reg.eraseRegistryTXT()
+            first = False
         reg.addData(debug=True)
         reg.writeXML()
-        reg.writeRegistryTXT("registry.txt")
+        reg.writeRegistryTXT()
     import sys
     sys.exit(0)
 
@@ -122,16 +194,15 @@ test()
 
 URL_DURATION = 86400
 
-# if os.exists("registry.txt"):
-#    os.unlink("registry.txt")
+first = True
 starting_project = dxpy.WORKSPACE_ID
 projects = list(dxpy.find_projects(return_handler=True))
 print "Found {} projects, for {}".format(len(projects), dxpy.whoami())
-# project_ids = [project["id"] for project in projects]
-# for project_id in project_ids:
-#    project = dxpy.DXProject(project_id)
 for project in projects:
     reg = DxProjectRegistry(project=project, genome="1kg_v37", URL_DURATION=86400)
+    if first:
+        reg.eraseRegistryTXT()
+        first = False
     reg.addData(debug=True)
     reg.writeXML()
     reg.writeRegistryTXT("registry.txt")
