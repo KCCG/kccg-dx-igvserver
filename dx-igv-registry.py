@@ -66,6 +66,7 @@ class DxProjectRegistry(object):
             "fields": {"id": True, "name": True, "class": True}}, "only": "folders", "includeHidden": False},
                                                   always_retry=True)["folders"]
         subfolders = [os.path.basename(subfolder) for subfolder in subfolders]
+        #subfolders = subfolders - ("metrics", "assets")
 
         for subfolder in subfolders:
             subnode = SubElement(self.Global, "Category", name=subfolder)
@@ -77,17 +78,18 @@ class DxProjectRegistry(object):
         )
         for dxfile in dxfiles:
             if isinstance(dxfile, dxpy.DXFile):
-                n, ext = os.path.splitext(dxfile.name)
-                if ext[1:] == "bam":
+                # n, ext = os.path.splitext(dxfile.name)
+                if str(dxfile.name).endswith("bam"):
                     self.__addIndexedFile(dxfile, folder, node, ["bai"])
                 elif str(dxfile.name).endswith("vcf.gz"):
-                    self.__addIndexedFile(dxfile, folder, node, ["idx", "tbi"])
+                    self.__addIndexedFile(dxfile, folder, node, ["tbi", "idx"])
                 elif str(dxfile.name).endswith("bw"):
                     self.__addNonIndexedFile(dxfile, folder, node)
                 elif str(dxfile.name).endswith("bed.gz"):
                     self.__addNonIndexedFile(dxfile, folder, node)
-                elif str(dxfile.name).endswith("tdf"):
-                    self.__addNonIndexedFile(dxfile, folder, node)
+                # mate the tdf up to its matching bam file.
+                #elif str(dxfile.name).endswith("tdf"):
+                #    self.__addNonIndexedFile(dxfile, folder, node)
 
     def __addIndexedFile(self, dxfile, folder, node, index_exts=["bai"]):
         """
@@ -101,8 +103,9 @@ class DxProjectRegistry(object):
         print "Adding {}:{}/{}".format(self.project.name, folder, dxfile.name)
         assert isinstance(dxfile, dxpy.DXFile)
 
+        name = str(dxfile.name).replace("gvcf.gz", "g.vcf.gz").replace("merged.dedup.realigned.", "")
         file_url = dxfile.get_download_url(
-            duration=self.URL_DURATION, filename=dxfile.name, preauthenticated=True
+            duration=self.URL_DURATION, filename=name, preauthenticated=True
         )
 
         index = None
@@ -110,7 +113,7 @@ class DxProjectRegistry(object):
             index_name = dxfile.name + "." + index_ext
             print "Looking for index file: {}".format(index_name)
             index = dxpy.find_one_data_object(
-                name=index_name, folder=folder, name_mode="exact",
+                name=index_name, folder=folder, name_mode="exact", recurse=False,
                 project=self.project.get_id(), zero_ok=True, return_handler=True
             )
             if not index is None:
@@ -121,14 +124,36 @@ class DxProjectRegistry(object):
             print "Skipping {}, failed to find an index file".format(dxfile.name)
             return None
 
+        name = str(index.name).replace("gvcf.gz", "g.vcf.gz").replace("merged.dedup.realigned.", "")
         indel_url = index.get_download_url(
-            duration=self.URL_DURATION, preauthenticated=True, filename=index.name
+            duration=self.URL_DURATION, preauthenticated=True, filename=name
         )
 
         resource = SubElement(node, "Resource")
         resource.set("name", dxfile.name)
         resource.set("path", file_url[0])
         resource.set("index", indel_url[0])
+        if "bai" in index_exts:
+            tdf_names = [str(dxfile.name).replace(".bam", ".tdf"), dxfile.name + ".tdf"]
+            tdf = None
+            for tdf_name in tdf_names:
+                print "Looking for tdf coverage file: {}".format(tdf_name)
+                tdf = dxpy.find_one_data_object(
+                    name=tdf_name, folder=folder, name_mode="exact", recurse=False,
+                    project=self.project.get_id(), zero_ok=True, return_handler=True
+                )
+                if tdf:
+                    break
+            if tdf is not None:
+                name = str(tdf.name).replace("gvcf.gz", "g.vcf.gz").replace("merged.dedup.realigned.", "")
+                tdf_url = tdf.get_download_url(
+                    duration=self.URL_DURATION, preauthenticated=True, filename=name
+                )
+                resource.set("coverage", tdf_url[0])
+            else:
+                resource.set("coverage", ".")
+        if "tbi" in index_exts:
+            resource.set("mapping", ".")
 
     def __addNonIndexedFile(self, dxfile, folder, node):
         """
@@ -141,8 +166,9 @@ class DxProjectRegistry(object):
         print "Adding {}:{}/{}".format(self.project.name, folder, dxfile.name)
         assert isinstance(dxfile, dxpy.DXFile)
 
+        name = str(dxfile.name).replace("gvcf.gz", "g.vcf.gz").replace("merged.dedup.realigned.", "")
         file_url = dxfile.get_download_url(
-            duration=self.URL_DURATION, filename=dxfile.name, preauthenticated=True
+            duration=self.URL_DURATION, filename=name, preauthenticated=True
         )
 
         resource = SubElement(node, "Resource")
@@ -231,21 +257,27 @@ class IgvRegistry(object):
         self.projects = []
         self.updateCache()
 
-    def testUpdate(self):
-        """Run a subset of projects"""
+    def updateProjects(self, project_ids, replace=False):
         first = True
-        # project_ids = (u'project-BzPb25j0627bFJv6q9g81ZX5', u'project-Bz6GbkQ0VGPv0fpqZZ6ZZGfx', u'project-Bb9KVk8029vp1qzXz4yx4xB3')
-        # project_ids = (u'project-BzPb25j0627bFJv6q9g81ZX5', u'project-Bb9KVk8029vp1qzXz4yx4xB3')
-        project_ids = (u'project-BzQ9qx80Y6qG6FF56Jq27145', u'project-BzPb25j0627bFJv6q9g81ZX5')  # NA12878 public
         for project_id in project_ids:
-            project = dxpy.DXProject(project_id)
+            if "project-" in project_id:
+                project = dxpy.DXProject(project_id)
+            else:
+                project = dxpy.DXProject(dxpy.find_one_project(name=project_id)["id"])
             reg = DxProjectRegistry(project=project, genome="1kg_v37", URL_DURATION=ONE_MONTH)
-            if first:
+            if replace and first:
                 reg.eraseRegistryTXT()
                 first = False
             reg.addData()
             reg.writeXML()
             reg.writeRegistryTXT()
+    
+    def testUpdate(self):
+        """Run a subset of projects"""
+        # project_ids = (u'project-BzPb25j0627bFJv6q9g81ZX5', u'project-Bz6GbkQ0VGPv0fpqZZ6ZZGfx', u'project-Bb9KVk8029vp1qzXz4yx4xB3')
+        # project_ids = (u'project-BzPb25j0627bFJv6q9g81ZX5', u'project-Bb9KVk8029vp1qzXz4yx4xB3')
+        project_ids = (u'project-BzQ9qx80Y6qG6FF56Jq27145', u'project-BzPb25j0627bFJv6q9g81ZX5')  # NA12878 public
+        self.updateProjects(project_ids)
 
 
 # reg = IgvRegistry()
@@ -254,10 +286,10 @@ class IgvRegistry(object):
 # reg.testUpdate()
 
 ONE_HOUR = 3600
-ONE_DAY = 3600 * 24 * 1
-ONE_WEEK = 3600 * 24 * 7
-ONE_MONTH = 3600 * 24 * 31
-ONE_YEAR = 3600 * 24 * 365
+ONE_DAY = ONE_HOUR * 24
+ONE_WEEK = ONE_DAY * 7
+ONE_MONTH = ONE_DAY * 31
+ONE_YEAR = ONE_DAY * 365
 
 
 def main(args):
@@ -267,6 +299,8 @@ def main(args):
         reg.testUpdate()
         import sys
         sys.exit(0)
+    elif args.project_id:
+        reg.updateProjects(args.project_id, args.force)
     elif args.force:
         reg.forceUpdate()
     elif args.update:
@@ -276,12 +310,14 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Generate an IGV registry, based on data that you can access in DNAnexus.',
-        epilog="And that's how you roll."
+        epilog="You will need to use IGV (Snapshot) until this functionality is in the latest release."
     )
 
     parser.add_argument('-t', '--test', help='Test mode, over a few projects only', action='store_true')
     parser.add_argument('-f', '--force', help='Force recreation of registry', action='store_true')
     parser.add_argument('-u', '--update', help='Update registry', action='store_true')
+    parser.add_argument('-p', '--project_id', action='append', type=str, required=False,
+                        help='Update specific project_id(s). Can be specified any number of times')
     parser.add_argument('-d', '--duration', help='Duration to generate URLs for', type=int, required=False,
                         default=ONE_MONTH, nargs=1)
     args = parser.parse_args()
