@@ -1,17 +1,21 @@
 #!/usr/bin/env python
 
-# Script to create an IGV session for a WGS sequencing project on dx
-# It creates one XML file for each DX project, and records these in a 
-# registry at ~/igvdata/$$_dataServerRegistry.txt
-# $$ is used by IGV to choose a different dataServerRegistry file depending on the active reference genome
+# Script to create an IGV server registry for WGS sequencing project(s) on DNAnexus
 #
-# Usage For Generating
-# --------------------
-#     mkdir ~/igvdata
-#     python dx-igv-registry.py -u
-#     python -m SimpleHTTPServer 8000
-#     IGV > View > Preferences > Advanced
-#      * Data Registry URL = http://localhost:8000/igvdata/$$_dataServerRegistry.txt
+# It creates one XML file for each DX project, and records these in a
+# registry at ~/igvdata/$$_dataServerRegistry.txt
+# $$ is substituted by IGV based on the selected reference genome.
+#
+# Usage For Generating XMLs
+# -------------------------
+# * [[ -d ~/igvdata ]] || mkdir ~/igvdata
+#
+# * Add one project to the registry
+#   python dx-igv-registry.py -p <project_id>
+# * Add all visible projects to the registry. Warning this may be very slow
+#   python dx-igv-registry.py -u
+#
+# Follow the first time configuration below
 #
 # Usage for End Users wanting to use an XML
 # -----------------------------------------
@@ -22,28 +26,29 @@
 # You need to do some setup to create a simple HTTP server, so IGV can connect to
 # this DNAnexus data.
 #
-# * mkdir ~/igvdata
+# * [[ -d ~/igvdata ]] || mkdir ~/igvdata
 # * put the xml file(s) in this folder
 # * create a txt file: ~/igvdata/1kg_v37_dataServerRegistry.txt, where each line
-#   represents one of these xml files. it should be a valid URL to the file. like this:
+#   is a valid URL, pointing to each of the xml files, for example:
 #   http://localhost:8000/igvdata/NEIWAT_Lung_Cancer_Project.xml
-#   If the filename has spaces in it, then they should the URL encoded, like this:
+#   If the filename has spaces or other characters in it, then they should the URL encoded, like this:
 #   http://localhost:8000/igvdata/Test%20IGV%20Server.xml
 #
-# * start an HTTP server (default is port 8000): cd $HOME && python -m SimpleHTTPServer
-# * open a new version of IGV (this works with >= 2.3.90) and configure it to use this
-#   local igv server:
+# * start an HTTP server: 
+#   cd $HOME && python -m SimpleHTTPServer 8000
+# * open a new version of IGV (this works with >= 2.3.90) and configure it to use the local server:
 #   View > Preferences > Advanced > Edit Server Properties
 #   * Data Registry URL = http://localhost:8000/igvdata/$$_dataServerRegistry.txt
+#
 # * load your new data tracks: File > Load From Server...
 # You should only have to do this configuration once.
 # You should shutdown the SimpleHTTPServer when you are done (Ctrl-C).
 #
 # Next time you want to connect to the data:
-# * cd $HOME && python -m SimpleHTTPServer
+# * cd $HOME && python -m SimpleHTTPServer 8000
 # * open IGV, and load your new data: File > Load From Server...
 #
-# Mark Cowley, 19/9/2016
+# Mark Cowley, 31/1/2017
 ##############################
 
 import argparse
