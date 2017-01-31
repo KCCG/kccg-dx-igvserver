@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Script to create an IGV server registry for WGS sequencing project(s) on DNAnexus
+# Script to create an IGV server registry to access data stored on DNAnexus
 #
 # It creates one XML file for each DX project, and records these in a
 # registry at ~/igvdata/$$_dataServerRegistry.txt
@@ -34,7 +34,7 @@
 #   If the filename has spaces or other characters in it, then they should the URL encoded, like this:
 #   http://localhost:8000/igvdata/Test%20IGV%20Server.xml
 #
-# * start an HTTP server: 
+# * start an HTTP server:
 #   cd $HOME && python -m SimpleHTTPServer 8000
 # * open a new version of IGV (this works with >= 2.3.90) and configure it to use the local server:
 #   View > Preferences > Advanced > Edit Server Properties
