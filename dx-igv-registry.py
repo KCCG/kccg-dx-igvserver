@@ -5,13 +5,43 @@
 # registry at ~/igvdata/$$_dataServerRegistry.txt
 # $$ is used by IGV to choose a different dataServerRegistry file depending on the active reference genome
 #
-# Usage
-# -----
+# Usage For Generating
+# --------------------
 #     mkdir ~/igvdata
 #     python dx-igv-registry.py -u
 #     python -m SimpleHTTPServer 8000
 #     IGV > View > Preferences > Advanced
 #      * Data Registry URL = http://localhost:8000/igvdata/$$_dataServerRegistry.txt
+#
+# Usage for End Users wanting to use an XML
+# -----------------------------------------
+# THe XML file contains URLs to all of the data within a DNAnexus project. These URLs are
+# pre-authenticated, ie you wont be asked fora password. So be careful
+# who you share this file with.
+#
+# You need to do some setup to create a very simple web server, so IGV can connect to
+# this DNAnexus data.
+#
+# * mkdir ~/igvdata
+# * put the xml file(s) in this folder
+# * create a txt file: ~/igvdata/1kg_v37_dataServerRegistry.txt, where each line
+#   represents one of these xml files. it should be a valid URL to the file. like this:
+#   http://localhost:8000/igvdata/NEIWAT_Lung_Cancer_Project.xml
+#   If the filename has spaces in it, then they should the URL encoded, like this:
+#   http://localhost:8000/igvdata/Test%20IGV%20Server.xml
+#
+# * start am HTTP server (default is port 8000): cd $HOME && python -m SimpleHTTPServer
+# * open a new version of IGV (this works with >= 2.3.90) and configure it to use this
+#   local igv server:
+#   View > Preferences > Advanced > Edit Server Properties
+#   * Data Registry URL = http://localhost:8000/igvdata/$$_dataServerRegistry.txt
+# * load your new data tracks: File > Load From Server...
+# You should only have to do this configuration once.
+# You should shutdown the SimpleHTTPServer when you are done (Ctrl-C).
+#
+# Next time you want to connect to the data:
+# * cd $HOME && python -m SimpleHTTPServer
+# * open IGV, and load your new data: File > Load From Server...
 #
 # Mark Cowley, 19/9/2016
 ##############################
@@ -310,7 +340,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Generate an IGV registry, based on data that you can access in DNAnexus.',
-        epilog="You will need to use IGV (Snapshot) until this functionality is in the latest release."
+        epilog="You will need to use a recent version IGV (> 2.3.90)."
     )
 
     parser.add_argument('-t', '--test', help='Test mode, over a few projects only', action='store_true')
