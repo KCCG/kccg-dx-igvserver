@@ -15,11 +15,11 @@
 #
 # Usage for End Users wanting to use an XML
 # -----------------------------------------
-# THe XML file contains URLs to all of the data within a DNAnexus project. These URLs are
-# pre-authenticated, ie you wont be asked fora password. So be careful
+# The XML file contains URLs to all of the data within a DNAnexus project. These URLs are
+# pre-authenticated, ie you wont be asked for a password. So be careful
 # who you share this file with.
 #
-# You need to do some setup to create a very simple web server, so IGV can connect to
+# You need to do some setup to create a simple HTTP server, so IGV can connect to
 # this DNAnexus data.
 #
 # * mkdir ~/igvdata
@@ -30,7 +30,7 @@
 #   If the filename has spaces in it, then they should the URL encoded, like this:
 #   http://localhost:8000/igvdata/Test%20IGV%20Server.xml
 #
-# * start am HTTP server (default is port 8000): cd $HOME && python -m SimpleHTTPServer
+# * start an HTTP server (default is port 8000): cd $HOME && python -m SimpleHTTPServer
 # * open a new version of IGV (this works with >= 2.3.90) and configure it to use this
 #   local igv server:
 #   View > Preferences > Advanced > Edit Server Properties
