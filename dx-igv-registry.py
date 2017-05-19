@@ -246,7 +246,7 @@ class DxProjectRegistry(object):
 
 
 class IgvRegistry(object):
-    def __init__(self, root="/Users/marcow/igvdata", URL_DURATION=86400):
+    def __init__(self, root="./", URL_DURATION=86400):
         self.root = root
         self.URL_DURATION = URL_DURATION
         self.txt = "1kg_v37_dataServerRegistry.txt"
@@ -328,7 +328,7 @@ ONE_YEAR = ONE_DAY * 365
 
 
 def main(args):
-    reg = IgvRegistry("/Users/marcow/igvdata", args.duration)
+    reg = IgvRegistry(args.igvdata, args.duration)
 
     if args.test:
         reg.testUpdate()
@@ -348,6 +348,7 @@ if __name__ == '__main__':
         epilog="You will need to use a recent version IGV (> 2.3.90)."
     )
 
+    parser.add_argument('-g', '--igvdata', help='Full local path to igvdata', type=str, required=True)
     parser.add_argument('-t', '--test', help='Test mode, over a few projects only', action='store_true')
     parser.add_argument('-f', '--force', help='Force recreation of registry', action='store_true')
     parser.add_argument('-u', '--update', help='Update registry', action='store_true')
