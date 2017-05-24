@@ -63,23 +63,23 @@ import dxpy
 class DxProjectRegistry(object):
     """Represent an DX Project as an IGV registry (XML)"""
 
-    def __init__(self, project, genome="1kg_v37", URL_DURATION=86400):
+    def __init__(self, project, genome="1kg_v37", url_prefix="http://localhost:8000/igvdata/", URL_DURATION=ONE_YEAR):
         """
-        
         :param project: 
         :param genome: 
+        :param genome: url_prefix
         :param URL_DURATION: number of seconds for which the generated URL will be valid 
         """
         assert isinstance(project, dxpy.DXProject)
 
         Global = Element('Global')
         Global.set("name", project.name)
-        #Global.set("genome", genome)
         Global.set("version", "1")
         self.Global = Global
         self.URL_DURATION = URL_DURATION
         self.genome = genome
         self.project = project
+        self.url_prefix = url_prefix
 
     def addData(self):
         """Add all data within a DX project to this DxProjectRegistry instance, starting at top level"""
@@ -96,7 +96,7 @@ class DxProjectRegistry(object):
         assert node is not None
         assert folder is not None
 
-        print "Adding {}:{}".format(self.project.name, folder)
+        print("Adding {}:{}".format(self.project.name, folder))
         subfolders = dxpy.api.project_list_folder(self.project.id, input_params={"folder": folder, "describe": {
             "fields": {"id": True, "name": True, "class": True}}, "only": "folders", "includeHidden": False},
                                                   always_retry=True)["folders"]
@@ -122,9 +122,10 @@ class DxProjectRegistry(object):
                     self.__addNonIndexedFile(dxfile, folder, node)
                 elif str(dxfile.name).endswith("bed.gz"):
                     self.__addNonIndexedFile(dxfile, folder, node)
-                # mate the tdf up to its matching bam file.
-                #elif str(dxfile.name).endswith("tdf"):
-                #    self.__addNonIndexedFile(dxfile, folder, node)
+                elif str(dxfile.name).endswith("seg"):
+                    self.__addNonIndexedFile(dxfile, folder, node)
+                elif str(dxfile.name).endswith("cn"):
+                    self.__addNonIndexedFile(dxfile, folder, node)
 
     def __addIndexedFile(self, dxfile, folder, node, index_exts=["bai"]):
         """
@@ -135,7 +136,7 @@ class DxProjectRegistry(object):
         :param index_exts: an array of allowable file extensions of the index file. eg ['bai'], or ['idx', 'tbi']
         :return: nothing
         """
-        print "Adding {}:{}/{}".format(self.project.name, folder, dxfile.name)
+        print("Adding {}:{}/{}".format(self.project.name, folder, dxfile.name))
         assert isinstance(dxfile, dxpy.DXFile)
 
         name = str(dxfile.name).replace("gvcf.gz", "g.vcf.gz").replace("merged.dedup.realigned.", "")
@@ -156,7 +157,7 @@ class DxProjectRegistry(object):
         if index is None:
             # raise dxpy.exceptions.DXSearchError("Could not find an index file for {}".format(dxfile.name))
             # raise RuntimeWarning("Skipping {}, failed to find an index file".format(dxfile.name))
-            print "Skipping {}, failed to find an index file".format(dxfile.name)
+            print("Skipping {}, failed to find an index file".format(dxfile.name))
             return None
 
         name = str(index.name).replace("gvcf.gz", "g.vcf.gz").replace("merged.dedup.realigned.", "")
@@ -172,7 +173,7 @@ class DxProjectRegistry(object):
             tdf_names = [str(dxfile.name).replace(".bam", ".tdf"), dxfile.name + ".tdf"]
             tdf = None
             for tdf_name in tdf_names:
-                print "Looking for tdf coverage file: {}".format(tdf_name)
+                print("Looking for tdf coverage file: {}".format(tdf_name))
                 tdf = dxpy.find_one_data_object(
                     name=tdf_name, folder=folder, name_mode="exact", recurse=False,
                     project=self.project.get_id(), zero_ok=True, return_handler=True
@@ -233,11 +234,22 @@ class DxProjectRegistry(object):
         # ElementTree(self.Global).write(filename, encoding="utf-8", xml_declaration=True)
         print "'%s' successfully created!" % filename
 
+    def pushXML(self, group):
+        """
+        push the XML manifest to remote IGV server.
+        This is currently hardcoded to seave.bio. You will need passwordless access to the remote server.
+        """
+        os.system('scp {} ubuntu@seave.bio:/var/www/html/igvdata/{}/'.format(self.getXmlName(), group))
+
     def writeRegistryTXT(self):
         filename = self.getRegistryName()
-        with open(filename, "a") as myfile:
-            url = quote("http://localhost:8000/igvdata/" + self.getXmlName(), safe="%/:=&?~#+!$,;'@()*[]")
-            myfile.write(url + "\n")
+        url = quote(self.url_prefix + self.getXmlName(), safe="%/:=&?~#+!$,;'@()*[]")
+        with open(filename, "r") as myfile:
+            urls = set(myfile.readlines())
+        urls.add(url)
+        with open(filename, "w") as myfile:
+            for url in urls:
+                myfile.write("%s\n" % url)
 
     def eraseRegistryTXT(self):
         filename = self.getRegistryName()
@@ -246,10 +258,11 @@ class DxProjectRegistry(object):
 
 
 class IgvRegistry(object):
-    def __init__(self, root="./", URL_DURATION=86400):
+    def __init__(self, genome="1kg_v37", root="./", URL_DURATION=ONE_YEAR):
         self.root = root
+        self.genome = genome  # How to track collections of projects with multiple species?
         self.URL_DURATION = URL_DURATION
-        self.txt = "1kg_v37_dataServerRegistry.txt"
+        self.txt = genome + "_dataServerRegistry.txt"
 
         manifests = []
         os.chdir(self.root)
@@ -269,7 +282,7 @@ class IgvRegistry(object):
         dx_project_names = [project.name for project in dx_projects]
         new_dx_projects = list(set(dx_project_names) - set(self.getProjects()))
         new_dx_projects = [x for x in new_dx_projects if not x.startswith('PIPELINE') and not x.endswith('resources')]
-        print "Found {} new projects on DNAnexus, for {}".format(len(new_dx_projects), dxpy.whoami())
+        print("Found {} new projects on DNAnexus, for {}".format(len(new_dx_projects), dxpy.whoami()))
         return new_dx_projects
 
     def addProjectToCache(self, project):
@@ -278,7 +291,7 @@ class IgvRegistry(object):
     def updateCache(self):
         new_projects = self.newProjects()
         for project in new_projects:
-            dxproj = DxProjectRegistry(project=project, genome="1kg_v37", URL_DURATION=86400)
+            dxproj = DxProjectRegistry(project=project, genome=self.genome, URL_DURATION=86400)
             dxproj.addData()
             dxproj.writeXML()
             dxproj.writeRegistryTXT()
@@ -299,7 +312,7 @@ class IgvRegistry(object):
                 project = dxpy.DXProject(project_id)
             else:
                 project = dxpy.DXProject(dxpy.find_one_project(name=project_id)["id"])
-            reg = DxProjectRegistry(project=project, genome="1kg_v37", URL_DURATION=ONE_MONTH)
+            reg = DxProjectRegistry(project=project, genome="1kg_v37", URL_DURATION=ONE_YEAR)
             if replace and first:
                 reg.eraseRegistryTXT()
                 first = False
@@ -345,7 +358,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Generate an IGV registry, based on data that you can access in DNAnexus.',
-        epilog="You will need to use a recent version IGV (> 2.3.90)."
+        epilog="You will need to use a recent version of IGV (> 2.3.90)."
     )
 
     parser.add_argument('-g', '--igvdata', help='Full local path to igvdata', type=str, required=False,
@@ -357,5 +370,9 @@ if __name__ == '__main__':
                         help='Update specific project_id(s). Can be specified any number of times')
     parser.add_argument('-d', '--duration', help='Duration to generate URLs for', type=int, required=False,
                         default=ONE_YEAR, nargs=1)
+    parser.add_argument('-s', '--seave', help='Push data across to seave.bio?', action='store_true', default=False)
+    parser.add_argument('-g', '--group', help='Remote IGV server Group to associate data with', type=str, required=False,
+                        default="TxGen", nargs=1)
+
     args = parser.parse_args()
     main(args)
