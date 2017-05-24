@@ -348,13 +348,14 @@ if __name__ == '__main__':
         epilog="You will need to use a recent version IGV (> 2.3.90)."
     )
 
-    parser.add_argument('-g', '--igvdata', help='Full local path to igvdata', type=str, required=True)
+    parser.add_argument('-g', '--igvdata', help='Full local path to igvdata', type=str, required=True,
+                        default=os.path.join(os.path.expanduser('~'), "igvdata"))
     parser.add_argument('-t', '--test', help='Test mode, over a few projects only', action='store_true')
     parser.add_argument('-f', '--force', help='Force recreation of registry', action='store_true')
     parser.add_argument('-u', '--update', help='Update registry', action='store_true')
     parser.add_argument('-p', '--project_id', action='append', type=str, required=False,
                         help='Update specific project_id(s). Can be specified any number of times')
     parser.add_argument('-d', '--duration', help='Duration to generate URLs for', type=int, required=False,
-                        default=ONE_MONTH, nargs=1)
+                        default=ONE_YEAR, nargs=1)
     args = parser.parse_args()
     main(args)
