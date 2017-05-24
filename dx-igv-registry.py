@@ -348,7 +348,7 @@ if __name__ == '__main__':
         epilog="You will need to use a recent version IGV (> 2.3.90)."
     )
 
-    parser.add_argument('-g', '--igvdata', help='Full local path to igvdata', type=str, required=True,
+    parser.add_argument('-g', '--igvdata', help='Full local path to igvdata', type=str, required=False,
                         default=os.path.join(os.path.expanduser('~'), "igvdata"))
     parser.add_argument('-t', '--test', help='Test mode, over a few projects only', action='store_true')
     parser.add_argument('-f', '--force', help='Force recreation of registry', action='store_true')
