@@ -126,7 +126,7 @@ class DxDataset(object):
             "fields": {"id": True, "name": True, "class": True}}, "only": "folders", "includeHidden": False},
                                                   always_retry=True)["folders"]
         subfolders = [os.path.basename(subfolder) for subfolder in subfolders]
-        #subfolders = subfolders - ("metrics", "assets")
+        subfolders = list(set(subfolders) - set(("metrics", "inputFastq", "reports")))
 
         for subfolder in subfolders:
             subnode = SubElement(self.Global, "Category", name=subfolder)
@@ -319,11 +319,12 @@ class IgvRegistry(object):
         htpasswd_path = '/home/ubuntu/.htpasswd_{}\n'.format(self.group)
         p = os.path.join(self.folder, ".htaccess")
         with open(p, 'w') as htaccess:
+            print("Initialising Apache folder-level security for " + p)
             htaccess.write('AuthUserFile ' + htpasswd_path)
             htaccess.write('AuthName "{}"\n'.format(self.group))
             htaccess.write('AuthType Basic\n')
             htaccess.write('Require valid-user\n')
-        print("Add username:password entries to " + htpasswd_path)
+        print("You need to add username:password entries to " + htpasswd_path)
 
     def updateCache(self):
         manifests = []
@@ -429,8 +430,8 @@ def main(args):
     assert(args.ref_genome in ["1kg_v37", "mm10", "hg19"])
 
     if args.seave:
-        #args.igvdata = '/Users/marcow/var/www/html/igvdata'  # local testing of Seave mode
-        args.igvdata = '/var/www/html/igvdata/'
+        args.igvdata = '/Users/marcow/var/www/html/igvdata'  # local testing of Seave mode
+        # args.igvdata = '/var/www/html/igvdata/'
         args.url = 'https://seave.bio/igvdata'
 
     reg = IgvRegistry(ref_genome=args.ref_genome, folder=args.igvdata, url_root=args.url,
