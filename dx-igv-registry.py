@@ -378,7 +378,7 @@ def main(args):
 
     if args.seave:
         #args.igvdata = '/Users/marcow/var/www/html/igvdata'
-        args.igvdata = '/var/www/html/temp/igvdata/'
+        args.igvdata = '/var/www/html/igvdata/'
         args.url = 'https://seave.bio/igvdata'
     folder = args.igvdata
     url = args.url
