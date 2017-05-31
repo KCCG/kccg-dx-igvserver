@@ -354,7 +354,7 @@ class IgvRegistry(object):
 
     def addDxDataset(self, project, xml_path):
         xml_relative_path = xml_path.replace(self.folder, '')
-        print("registry root path: {}\nxml_path: {}\nxml_relative_path: {}\nurl_root: {}".format(self.folder, xml_path, xml_relative_path, self.url_root))
+        #print("registry root path: {}\nxml_path: {}\nxml_relative_path: {}\nurl_root: {}".format(self.folder, xml_path, xml_relative_path, self.url_root))
         url = self.url_root + xml_relative_path
         url = quote(url, safe="%/:=&?~#+!$,;'@()*[]")
         print("Adding {} to registry at {}".format(url, self.path))
