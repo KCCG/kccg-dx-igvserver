@@ -12,7 +12,7 @@
 #
 # * Add one project to the registry
 #   python dx-igv-registry.py -p <project_id>
-# * Add all visible projects to the registry. Warning this may be very slow
+# * Add all visible projects to the registry. Warning this may take a very long time
 #   python dx-igv-registry.py -u
 #
 # Follow the first time configuration below
@@ -256,6 +256,8 @@ class IgvRegistry(object):
         :param url_duration: default duration to create web URLs for.
         """
         self.folder = folder
+        if not os.path.exists(self.folder):
+            os.mkdir(self.folder)
         self.txt = ref_genome + "_dataServerRegistry.txt"
         self.path = os.path.join(self.folder, self.txt)
         self.url_root = url_root
@@ -292,9 +294,9 @@ class IgvRegistry(object):
 
     def addDxDataset(self, project, xml_path):
         xml_relative_path = xml_path.replace(self.folder, '')
-        print("registry root path: {}\nxml_path: {}\nxml_relative_path: {}".format(self.folder, xml_path, xml_relative_path))
-        from urlparse import urljoin
-        url = quote(urljoin(self.url_root, xml_relative_path), safe="%/:=&?~#+!$,;'@()*[]")
+        print("registry root path: {}\nxml_path: {}\nxml_relative_path: {}\nurl_root: {}".format(self.folder, xml_path, xml_relative_path, self.url_root))
+        url = self.url_root + xml_relative_path
+        url = quote(url, safe="%/:=&?~#+!$,;'@()*[]")
         print("Adding {} to registry at {}".format(url, self.path))
 
         if os.path.exists(self.path):
@@ -375,7 +377,8 @@ def main(args):
     assert(args.ref_genome in ["1kg_v37", "mm10", "hg19"])
 
     if args.seave:
-        args.igvdata = '/Users/marcow/var/www/html/igvdata'
+        #args.igvdata = '/Users/marcow/var/www/html/igvdata'
+        args.igvdata = '/var/www/html/temp/igvdata/'
         args.url = 'https://seave.bio/igvdata'
     folder = args.igvdata
     url = args.url
