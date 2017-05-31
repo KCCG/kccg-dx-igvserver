@@ -6,12 +6,29 @@
 # registry at ~/igvdata/$$_dataServerRegistry.txt
 # $$ is substituted by IGV based on the selected reference ref_genome.
 #
-# Usage For Generating XMLs
-# -------------------------
+# Usage For Generating XMLs on a local machine
+# --------------------------------------------
 # * [[ -d ~/igvdata ]] || mkdir ~/igvdata
 #
 # * Add one project to the registry
 #   python dx-igv-registry.py -p <project_id>
+# * Add all visible projects to the registry. Warning this may take a very long time
+#   python dx-igv-registry.py -u
+#
+# Follow the first time configuration below
+#
+# Usage For Generating XMLs on Remote Server
+# ------------------------------------------
+# * First time setup
+# * if [[ ! -d /var/www/html/igvdata ]]; then
+#     mkdir /var/www/html/igvdata
+#     sudo chgrp -R www-data /var/www/html/igvdata
+#     chmod -R 750 /var/www/html/igvdata
+#   fi
+# * setup security: see PIPELINE-1214
+#
+# * Add one project to the registry
+#   python dx-igv-registry.py -p <project_id> --seave -g GROUP_NAME
 # * Add all visible projects to the registry. Warning this may take a very long time
 #   python dx-igv-registry.py -u
 #
@@ -58,6 +75,7 @@ from urllib import quote
 from xml.etree.ElementTree import ElementTree, Element, SubElement, tostring
 import xml.dom.minidom
 import dxpy
+import sys
 
 ONE_HOUR = 3600
 ONE_DAY = ONE_HOUR * 24
@@ -239,10 +257,19 @@ class DxDataset(object):
         return file_path
 
 
+def touch(path):
+    """
+    Update the timestamp on a file. If necessary it will be created.
+    """
+    with open(path, 'a'):
+        os.utime(path, None)
+
 class IgvRegistry(object):
     def __init__(self, ref_genome="1kg_v37",
                  folder=os.path.join(os.path.expanduser('~'), "igvdata"),
-                 url_root='http://localhost:8000/igvdata', url_duration=ONE_YEAR):
+                 url_root='http://localhost:8000/igvdata',
+                 url_duration=ONE_YEAR,
+                 group=None):
         """
         An IgvRegistry is a TXT file, pointing to XML files representing Datasets to be loaded into IGV.
         The TXT file lives on a web server (within `folder`), and is accessible via a url (`url_root` + TXT).
@@ -254,17 +281,49 @@ class IgvRegistry(object):
          ref_genome's used
         :param url_root: the web url prefix, representing the web-accessible URL to `folder` 
         :param url_duration: default duration to create web URLs for.
+        :param group: Group represents a way to share data with a specific research group. Eg LKCGP. if group is specified,
+        then the XML and TXT registry files will be found within url_root + group. The first time that a group is made,
+        an .htaccess file is made
         """
-        self.folder = folder
-        if not os.path.exists(self.folder):
-            os.mkdir(self.folder)
-        self.txt = ref_genome + "_dataServerRegistry.txt"
-        self.path = os.path.join(self.folder, self.txt)
-        self.url_root = url_root
+        self.group = group
         self.ref_genome = ref_genome
+        self.txt = self.ref_genome + "_dataServerRegistry.txt"
         self.url_duration = url_duration
+        
+        if self.group:
+            assert self.group == quote(self.group)
+            self.folder = os.path.join(folder, group)
+            self.url_root = os.path.join(url_root, group)
+        else:
+            self.folder = folder
+            self.url_root = url_root
+        
+        self.initialise_folder()
+        self.path = os.path.join(self.folder, self.txt)
+        touch(self.path)
+        
         self.projects = []
         self.updateCache()
+
+    def initialise_folder(self):
+        """
+        initialise an IgvRegistry folder. it will create an .htaccess file
+        """
+        if not os.path.exists(self.folder):
+            print("Initialising " + self.folder)
+            os.mkdir(self.folder)
+            self.write_htaccess_file()
+
+    def write_htaccess_file(self):
+        assert self.group is not None
+        htpasswd_path = '/home/ubuntu/.htpasswd_{}\n'.format(self.group)
+        p = os.path.join(self.folder, ".htaccess")
+        with open(p, 'w') as htaccess:
+            htaccess.write('AuthUserFile ' + htpasswd_path)
+            htaccess.write('AuthName "{}"\n'.format(self.group))
+            htaccess.write('AuthType Basic\n')
+            htaccess.write('Require valid-user\n')
+        print("Add username:password entries to " + htpasswd_path)
 
     def updateCache(self):
         manifests = []
@@ -344,15 +403,6 @@ class IgvRegistry(object):
         if os.path.exists(self.path):
             os.unlink(self.path)
 
-    #def updateCache(self):
-    #    """The cache represents an in-memory set of projects within the Registry."""
-    #    new_projects = self.findNewProjects()
-    #    for project in new_projects:
-    #        dxproj = DxDataset(project=project, ref_genome=self.ref_genome, url_duration=ONE_YEAR)
-    #        dxproj.addData()
-    #        xml_path = dxproj.writeXML()
-    #        self.addXml(project, xml_path)
-
     def testUpdate(self):
         """Run a subset of projects"""
         # project_ids = (u'project-BzPb25j0627bFJv6q9g81ZX5', u'project-Bz6GbkQ0VGPv0fpqZZ6ZZGfx', u'project-Bb9KVk8029vp1qzXz4yx4xB3')
@@ -360,6 +410,8 @@ class IgvRegistry(object):
         project_ids = (u'project-BzQ9qx80Y6qG6FF56Jq27145', u'project-BzPb25j0627bFJv6q9g81ZX5')  # NA12878 public
         self.addProjects(project_ids)
 
+# TESTING
+#
 # from dx_igv_registry import *
 # reg = IgvRegistry()
 # reg.getProjects()
@@ -377,20 +429,15 @@ def main(args):
     assert(args.ref_genome in ["1kg_v37", "mm10", "hg19"])
 
     if args.seave:
-        #args.igvdata = '/Users/marcow/var/www/html/igvdata'
+        #args.igvdata = '/Users/marcow/var/www/html/igvdata'  # local testing of Seave mode
         args.igvdata = '/var/www/html/igvdata/'
         args.url = 'https://seave.bio/igvdata'
-    folder = args.igvdata
-    url = args.url
-    if args.group:
-        folder = os.path.join(folder, args.group)
-        url = os.path.join(url, args.group)
 
-    reg = IgvRegistry(args.ref_genome, folder, url, args.duration)
+    reg = IgvRegistry(ref_genome=args.ref_genome, folder=args.igvdata, url_root=args.url,
+                      url_duration=args.duration, group=args.group)
 
     if args.test:
         reg.testUpdate()
-        import sys
         sys.exit(0)
     elif args.project_id:
         reg.addProjects(args.project_id)
@@ -406,6 +453,8 @@ if __name__ == '__main__':
         epilog="You will need to use a recent version of IGV (> 2.3.90)."
     )
 
+    parser.add_argument('--seave', help='Seave mode: set --igvdata and --url appropriately for the seave.bio server',
+                        action='store_true')
     parser.add_argument('--igvdata', help='Full local path to igvdata', type=str, required=False,
                         default=os.path.join(os.path.expanduser('~'), "igvdata"))
     parser.add_argument('--url', help='web accessible URL to igvdata', type=str, required=False,
@@ -417,9 +466,10 @@ if __name__ == '__main__':
                         help='Update specific project_id(s). Can be specified any number of times')
     parser.add_argument('-d', '--duration', help='Duration to generate URLs for', type=int, required=False,
                         default=ONE_YEAR, nargs=1)
-    parser.add_argument('-r', '--ref_genome', help="reference ref_genome build (eg 1kg_v37, mm10, hg19)", type=str, default="1kg_v37")
-    parser.add_argument('-g', '--group', help='Remote IGV server Group to associate data with', type=str, required=False)
-    parser.add_argument('--seave', help='Seave mode: set --igvdata and --url appropriately for the seave.bio server', action='store_true')
+    parser.add_argument('-r', '--ref_genome', help="reference ref_genome build (eg 1kg_v37, mm10, hg19)", type=str,
+                        default="1kg_v37")
+    parser.add_argument('-g', '--group', help='Remote IGV server Group to associate data with', type=str,
+                        required=False)
 
     args = parser.parse_args()
     main(args)
