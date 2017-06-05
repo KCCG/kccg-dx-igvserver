@@ -1,6 +1,8 @@
 # installation
 
 ## dx-toolkit
+
+
     sudo apt-get install -y python-dev
     wget https://wiki.dnanexus.com/images/files/dx-toolkit-v0.222.0-ubuntu-14.04-amd64.tar.gz
     tar -xzvf dx-toolkit-v0.222.0-ubuntu-14.04-amd64.tar.gz 
@@ -9,6 +11,7 @@
 ## install dx-igv-registry from source
 * damn, git clone isn't working with ssh or http
 
+
     [[ -d ~/apps ]] || mkdir ~/apps
     cd ~/apps
     git clone ssh://git@kccg.garvan.org.au:7999/nex/kccg-dx-igvserver.git
@@ -16,6 +19,8 @@
     git checkout PIPELINE-1215-seave.bio
 
 ## dev workaround
+
+
     cd ~/src/DNANexus_Applets/kccg-dx-igvserver/
     cat push2seave.sh
     #!/bin/bash
@@ -27,6 +32,11 @@
     ./push2seave.sh
 
 # usage
+* This runs on localhost, or on seave.bio. You can either install the requirements to a globally acecssible location,
+  or use a virtualenv.
+
+
+    ssh seave.bio
     cd /home/ubuntu/apps/kccg-dx-igvserver/
     test -d venv || python virtualenv-1.11.6/virtualenv.py -p python2.7 venv
     source venv/bin/activate
@@ -40,9 +50,18 @@
     for project_id in $(dx find projects --tag LKCGP --brief); do ./dx-igv-registry.py -p $project_id -g LKCGP; done
     for project_id in $(dx find projects --tag MoST --brief); do echo ./dx-igv-registry.py -p $project_id -g MoST; done
 
-# Configure IGV
-    View > Preferences > Advanced
-    https://dev.seave.bio/igvdata/LKCGP/$$_dataServerRegistry.txt
+# IGV setup is simple, and you only have to do this once:
+  * open IGV, version 2.3.90 or newer
+  * View > Preferences > Advanced
+  * set Data Registry URL = https://seave.bio/igvdata/LKCGP/$$_dataServerRegistry.txt
+  * Hit OK
+  * Ensure that your reference genome is “Human (1kg, b37+decoy)”
+  
+# IGV Usage:
+  * open IGV, version 2.3.90 or newer
+  * File > Load from Server…
+  * Enter your username + password
+  * Select the appropriate data to load.
 
 # Dev notes below
 ## working list LKCGP
