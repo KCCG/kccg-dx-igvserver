@@ -36,3 +36,4 @@ enter this information, and let Mark, or Vel know.
 
 
     for project_id in $(dx find projects --tag LKCGP --brief); do ./dx-igv-registry.py -p $project_id -g LKCGP; done
+* See Readme.Developer.md for more info.

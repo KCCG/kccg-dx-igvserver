@@ -3,8 +3,10 @@
 # Script to create an IGV server registry to access data stored on DNAnexus
 #
 # It creates one XML file for each DX project, and records these in a
-# registry at ~/igvdata/$$_dataServerRegistry.txt
+# registry $$_dataServerRegistry.txt
 # $$ is substituted by IGV based on the selected reference ref_genome.
+#
+# THIS IS A BIT OUT OF DATE. Consder the information in Readme.md
 #
 # Usage For Generating XMLs on a local machine
 # --------------------------------------------
