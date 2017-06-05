@@ -95,7 +95,15 @@ class DxDataset(object):
         :param ref_genome: 
         :param url_duration: number of seconds for which the generated URL will be valid 
         """
+        if isinstance(project, dxpy.DXProject):
+            pass
+        elif project.startswith("project-"):
+            project = dxpy.DXProject(project)
+        else:
+            project = dxpy.DXProject(dxpy.find_one_project(name=project)["id"])
+
         assert isinstance(project, dxpy.DXProject)
+        self.project = project
 
         Global = Element('Global')
         Global.set("name", project.name)
@@ -103,7 +111,6 @@ class DxDataset(object):
         self.Global = Global
         self.url_duration = url_duration
         self.genome = ref_genome
-        self.project = project
 
     def addData(self):
         """
@@ -349,14 +356,10 @@ class IgvRegistry(object):
         :param project_ids: list of project-id's, either by their name, or their project-id
         """
         for project_id in project_ids:
-            if project_id.startswith("project-"):
-                project = dxpy.DXProject(project_id)
-            else:
-                project = dxpy.DXProject(dxpy.find_one_project(name=project_id)["id"])
-            dx_project = DxDataset(project=project, ref_genome=self.ref_genome, url_duration=self.url_duration)
+            dx_project = DxDataset(project=project_id, ref_genome=self.ref_genome, url_duration=self.url_duration)
             dx_project.addData()
             xml_path = dx_project.writeXML(self.folder)
-            self.addDxDataset(project, xml_path)
+            self.addDxDataset(dx_project.project, xml_path)
 
     def addDxDataset(self, project, xml_path):
         xml_relative_path = xml_path.replace(self.folder, '')
@@ -435,30 +438,39 @@ class IgvRegistry(object):
 def main(args):
     assert(args.ref_genome in ["1kg_v37", "mm10", "hg19"])
 
-    hostname = socket.gethostname()
-    if not args.igvdata or not args.url:
-        if hostname == 'ip-172-31-59-137':
-            args.url = 'https://seave.bio/igvdata'
-            args.igvdata = '/var/www/html/igvdata/'
-        elif hostname == 'ip-172-31-50-139':
-            args.url = 'https://dev.seave.bio/igvdata'
-            args.igvdata = '/var/www/html/igvdata/'
-        else:
-            # args.igvdata = '~/var/www/html/igvdata'  # local testing of Seave mode
-            args.igvdata = os.path.join(os.path.expanduser('~'), "igvdata")
-            args.url = 'https://localhost:8000/igvdata/'
-    os.path.exists(args.igvdata) or os.mkdir(args.igvdata)
-
-    reg = IgvRegistry(ref_genome=args.ref_genome, folder=args.igvdata, url_root=args.url,
-                      url_duration=args.duration, group=args.group)
-
-    if args.project_id:
-        reg.addProjects(args.project_id)
-    elif args.test:
-        reg.testUpdate()
-        sys.exit(0)
-    elif args.force:
-        reg.forceUpdate()
+    if args.xmlOnly:
+        """Only create the XML file in current working dir. Don't add it to a registry"""
+        for project_id in args.project_ids:
+            dx_project = DxDataset(project=project_id, ref_genome=args.ref_genome, url_duration=args.duration)
+            dx_project.addData()
+            xml_path = dx_project.writeXML(".")
+            print("Wrote {} ({}) to {}".format(dx_project.project.name, dx_project.project.id, xml_path))
+    else:
+        """Create an XML manifest, and add it to an Igv Data Server registry"""
+        hostname = socket.gethostname()
+        if not args.igvdata or not args.url:
+            if hostname == 'ip-172-31-59-137':
+                args.url = 'https://seave.bio/igvdata'
+                args.igvdata = '/var/www/html/igvdata/'
+            elif hostname == 'ip-172-31-50-139':
+                args.url = 'https://dev.seave.bio/igvdata'
+                args.igvdata = '/var/www/html/igvdata/'
+            else:
+                # args.igvdata = '~/var/www/html/igvdata'  # local testing of Seave mode
+                args.igvdata = os.path.join(os.path.expanduser('~'), "igvdata")
+                args.url = 'https://localhost:8000/igvdata/'
+        os.path.exists(args.igvdata) or os.mkdir(args.igvdata)
+    
+        reg = IgvRegistry(ref_genome=args.ref_genome, folder=args.igvdata, url_root=args.url,
+                          url_duration=args.duration, group=args.group)
+    
+        if args.project_id:
+            reg.addProjects(args.project_id)
+        elif args.test:
+            reg.testUpdate()
+            sys.exit(0)
+        elif args.force:
+            reg.forceUpdate()
 
 
 if __name__ == '__main__':
@@ -475,6 +487,7 @@ if __name__ == '__main__':
                         default="1kg_v37")
     parser.add_argument('-g', '--group', help='Remote IGV server Group to associate data with', type=str,
                         required=False)
+    parser.add_argument('--xmlOnly', help='[Advanced] Only create an XML file', type=str, required=False)
     parser.add_argument('--igvdata', help='[Advanced] Override the path to local igvdata', type=str, required=False)
     parser.add_argument('--url', help='[Advanced] Override the web accessible URL to igvdata', type=str, required=False)
     parser.add_argument('-t', '--test', help='Test mode, over a few projects only', action='store_true')
