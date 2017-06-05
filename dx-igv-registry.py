@@ -76,6 +76,7 @@ from xml.etree.ElementTree import ElementTree, Element, SubElement, tostring
 import xml.dom.minidom
 import dxpy
 import sys
+import socket
 
 ONE_HOUR = 3600
 ONE_DAY = ONE_HOUR * 24
@@ -141,16 +142,16 @@ class DxDataset(object):
                 # n, ext = os.path.splitext(dxfile.name)
                 if str(dxfile.name).endswith("bam"):
                     self.__addIndexedFile(dxfile, folder, node, ["bai"])
-                #elif str(dxfile.name).endswith("vcf.gz"):
-                #    self.__addIndexedFile(dxfile, folder, node, ["tbi", "idx"])
-                #elif str(dxfile.name).endswith("bw"):
-                #    self.__addNonIndexedFile(dxfile, folder, node)
-                #elif str(dxfile.name).endswith("bed.gz"):
-                #    self.__addNonIndexedFile(dxfile, folder, node)
-                #elif str(dxfile.name).endswith("seg"):
-                #    self.__addNonIndexedFile(dxfile, folder, node)
-                #elif str(dxfile.name).endswith("cn"):
-                #    self.__addNonIndexedFile(dxfile, folder, node)
+                elif str(dxfile.name).endswith("vcf.gz"):
+                    self.__addIndexedFile(dxfile, folder, node, ["tbi", "idx"])
+                elif str(dxfile.name).endswith("bw"):
+                    self.__addNonIndexedFile(dxfile, folder, node)
+                elif str(dxfile.name).endswith("bed.gz"):
+                    self.__addNonIndexedFile(dxfile, folder, node)
+                elif str(dxfile.name).endswith("seg"):
+                    self.__addNonIndexedFile(dxfile, folder, node)
+                elif str(dxfile.name).endswith("cn"):
+                    self.__addNonIndexedFile(dxfile, folder, node)
 
     def __addIndexedFile(self, dxfile, folder, node, index_exts=["bai"]):
         """
@@ -298,9 +299,8 @@ class IgvRegistry(object):
             self.folder = folder
             self.url_root = url_root
         
-        self.initialise_folder()
         self.path = os.path.join(self.folder, self.txt)
-        touch(self.path)
+        self.initialise_folder()
         
         self.projects = []
         self.updateCache()
@@ -313,6 +313,11 @@ class IgvRegistry(object):
             print("Initialising " + self.folder)
             os.mkdir(self.folder)
             self.write_htaccess_file()
+        touch(self.path)
+        if self.ref_genome == "1kg_v37":
+            for alias in ("hg19", "b37"):
+                if not os.path.exists(self.path.replace(self.ref_genome, alias)):
+                    os.symlink(self.path, self.path.replace(self.ref_genome, alias))
 
     def write_htaccess_file(self):
         assert self.group is not None
@@ -325,6 +330,7 @@ class IgvRegistry(object):
             htaccess.write('AuthType Basic\n')
             htaccess.write('Require valid-user\n')
         print("You need to add username:password entries to " + htpasswd_path)
+        print("Visit http://www.kxs.net/support/ htaccess_pw.html to generate passwords")
 
     def updateCache(self):
         manifests = []
@@ -420,32 +426,39 @@ class IgvRegistry(object):
 # reg.testUpdate()
 
 # from dx_igv_registry import *
-# reg = IgvRegistry("1kg_v37", '/Users/marcow/var/www/html/temp/igvdata/', 'https://seave.bio/igvdata/', ONE_DAY)
+# reg = IgvRegistry("1kg_v37", '/Users/marcow/var/www/html/igvdata/', 'https://seave.bio/igvdata/', ONE_DAY)
 # reg.getProjects()
 # reg.testUpdate()
-# with open('/Users/marcow/var/www/html/temp/igvdata/1kg_v37_dataServerRegistry.txt', "r") as myregistry:
+# with open('/Users/marcow/var/www/html/igvdata/1kg_v37_dataServerRegistry.txt', "r") as myregistry:
 #    myregistry.readlines()
 
 def main(args):
     assert(args.ref_genome in ["1kg_v37", "mm10", "hg19"])
 
-    if args.seave:
-        args.igvdata = '/Users/marcow/var/www/html/igvdata'  # local testing of Seave mode
-        # args.igvdata = '/var/www/html/igvdata/'
-        args.url = 'https://seave.bio/igvdata'
+    hostname = socket.gethostname()
+    if not args.igvdata or not args.url:
+        if hostname == 'ip-172-31-59-137':
+            args.url = 'https://seave.bio/igvdata'
+            args.igvdata = '/var/www/html/igvdata/'
+        elif hostname == 'ip-172-31-50-139':
+            args.url = 'https://dev.seave.bio/igvdata'
+            args.igvdata = '/var/www/html/igvdata/'
+        else:
+            # args.igvdata = '~/var/www/html/igvdata'  # local testing of Seave mode
+            args.igvdata = os.path.join(os.path.expanduser('~'), "igvdata")
+            args.url = 'https://localhost:8000/igvdata/'
+    os.path.exists(args.igvdata) or os.mkdir(args.igvdata)
 
     reg = IgvRegistry(ref_genome=args.ref_genome, folder=args.igvdata, url_root=args.url,
                       url_duration=args.duration, group=args.group)
 
-    if args.test:
+    if args.project_id:
+        reg.addProjects(args.project_id)
+    elif args.test:
         reg.testUpdate()
         sys.exit(0)
-    elif args.project_id:
-        reg.addProjects(args.project_id)
     elif args.force:
         reg.forceUpdate()
-    elif args.update:
-        reg.updateCache()
 
 
 if __name__ == '__main__':
@@ -454,23 +467,18 @@ if __name__ == '__main__':
         epilog="You will need to use a recent version of IGV (> 2.3.90)."
     )
 
-    parser.add_argument('--seave', help='Seave mode: set --igvdata and --url appropriately for the seave.bio server',
-                        action='store_true')
-    parser.add_argument('--igvdata', help='Full local path to igvdata', type=str, required=False,
-                        default=os.path.join(os.path.expanduser('~'), "igvdata"))
-    parser.add_argument('--url', help='web accessible URL to igvdata', type=str, required=False,
-                        default='http://localhost:8000/igvdata')
-    parser.add_argument('-t', '--test', help='Test mode, over a few projects only', action='store_true')
-    parser.add_argument('-f', '--force', help='Force recreation of registry', action='store_true')
-    parser.add_argument('-u', '--update', help='Update registry', action='store_true')
     parser.add_argument('-p', '--project_id', action='append', type=str, required=False,
-                        help='Update specific project_id(s). Can be specified any number of times')
-    parser.add_argument('-d', '--duration', help='Duration to generate URLs for', type=int, required=False,
-                        default=ONE_YEAR, nargs=1)
+                        help='Update specific project_id(s), or project_name(s). Can be specified any number of times')
+    parser.add_argument('-d', '--duration', help='Duration to generate URLs for, in seconds', type=int, required=False,
+                        default=ONE_YEAR)
     parser.add_argument('-r', '--ref_genome', help="reference ref_genome build (eg 1kg_v37, mm10, hg19)", type=str,
                         default="1kg_v37")
     parser.add_argument('-g', '--group', help='Remote IGV server Group to associate data with', type=str,
                         required=False)
+    parser.add_argument('--igvdata', help='[Advanced] Override the path to local igvdata', type=str, required=False)
+    parser.add_argument('--url', help='[Advanced] Override the web accessible URL to igvdata', type=str, required=False)
+    parser.add_argument('-t', '--test', help='Test mode, over a few projects only', action='store_true')
+    parser.add_argument('-f', '--force', help='Force recreation of XML files within a registry', action='store_true')
 
     args = parser.parse_args()
     main(args)
