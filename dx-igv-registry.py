@@ -381,7 +381,7 @@ class IgvRegistry(object):
 def main(args):
     assert(args.ref_genome in ["1kg_v37", "mm10", "hg19"])
 
-    if args.xmlOnly:
+    if args.xml_only:
         """Only create the XML file in current working dir. Don't add it to a registry"""
         for project_id in args.project_ids:
             dx_project = DxDataset(project=project_id, ref_genome=args.ref_genome, url_duration=args.duration)
@@ -391,25 +391,25 @@ def main(args):
     else:
         """Create an XML manifest, and add it to an Igv Data Server registry"""
         hostname = socket.gethostname()
-        if not args.igvdata or not args.url:
+        if not args.igvdata_path or not args.igvdata_url:
             if hostname == 'ip-172-31-59-137':
-                args.url = 'https://seave.bio/igvdata'
-                args.igvdata = '/var/www/html/igvdata/'
+                args.igvdata_url = 'https://seave.bio/igvdata'
+                args.igvdata_path = '/var/www/html/igvdata/'
             elif hostname == 'ip-172-31-50-139':
-                args.url = 'https://dev.seave.bio/igvdata'
-                args.igvdata = '/var/www/html/igvdata/'
+                args.igvdata_url = 'https://dev.seave.bio/igvdata'
+                args.igvdata_path = '/var/www/html/igvdata/'
             else:
-                # args.igvdata = '~/var/www/html/igvdata'  # local testing of Seave mode
-                args.igvdata = os.path.join(os.path.expanduser('~'), "igvdata")
-                args.url = 'https://localhost:8000/igvdata/'
-        os.path.exists(args.igvdata) or os.mkdir(args.igvdata)
+                # args.igvdata_path = '~/var/www/html/igvdata'  # local testing of Seave mode
+                args.igvdata_path = os.path.join(os.path.expanduser('~'), "igvdata")
+                args.igvdata_url = 'https://localhost:8000/igvdata/'
+        os.path.exists(args.igvdata_path) or os.mkdir(args.igvdata_path)
         print("See Readme.Developer.md to set the permissions of this folder properly.")
-    
-        reg = IgvRegistry(ref_genome=args.ref_genome, folder=args.igvdata, url_root=args.url,
+
+        reg = IgvRegistry(ref_genome=args.ref_genome, folder=args.igvdata_path, url_root=args.igvdata_url,
                           url_duration=args.duration, group=args.group)
-    
-        if args.project_id:
-            reg.addProjects(args.project_id)
+
+        if args.project_ids:
+            reg.addProjects(args.project_ids)
         elif args.test:
             reg.testUpdate()
             sys.exit(0)
@@ -423,16 +423,17 @@ if __name__ == '__main__':
         epilog="You will need to use a recent version of IGV (> 2.3.90)."
     )
 
-    parser.add_argument('-p', '--project_id', action='append', type=str, required=False,
+    parser.add_argument('-p', '--project_id', dest='project_ids', action='append', type=str, required=False,
                         help='Update specific project_id(s), or project_name(s). Can be specified any number of times')
+    parser.add_argument('-g', '--group', help='Remote IGV server Group to associate data with', type=str,
+                        required=False)
     parser.add_argument('-d', '--duration', help='Duration to generate URLs for, in seconds', type=int, required=False,
                         default=ONE_YEAR)
     parser.add_argument('-r', '--ref_genome', help="reference ref_genome build (eg 1kg_v37, mm10, hg19)", type=str,
                         default="1kg_v37")
-    parser.add_argument('-g', '--group', help='Remote IGV server Group to associate data with', type=str,
-                        required=False)
-    parser.add_argument('--xmlOnly', help='[Advanced] Only create an XML file', action='store_true')
-    parser.add_argument('--igvdata', help='[Advanced] Override the path to local igvdata', type=str, required=False)
+    parser.add_argument('-x', '--xml_only', help='[Advanced] Create an XML file, but dont add it to a registry', 
+                        action='store_true')
+    parser.add_argument('--igvdata_path', help='[Advanced] Override the path to local igvdata', type=str, required=False)
     parser.add_argument('--url', help='[Advanced] Override the web accessible URL to igvdata', type=str, required=False)
     parser.add_argument('-t', '--test', help='Test mode, over a few projects only', action='store_true')
     parser.add_argument('-f', '--force', help='Force recreation of XML files within a registry', action='store_true')
