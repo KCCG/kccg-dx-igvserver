@@ -6,66 +6,7 @@
 # registry $$_dataServerRegistry.txt
 # $$ is substituted by IGV based on the selected reference ref_genome.
 #
-# THIS IS A BIT OUT OF DATE. Consder the information in Readme.md
-#
-# Usage For Generating XMLs on a local machine
-# --------------------------------------------
-# * [[ -d ~/igvdata ]] || mkdir ~/igvdata
-#
-# * Add one project to the registry
-#   python dx-igv-registry.py -p <project_id>
-# * Add all visible projects to the registry. Warning this may take a very long time
-#   python dx-igv-registry.py -u
-#
-# Follow the first time configuration below
-#
-# Usage For Generating XMLs on Remote Server
-# ------------------------------------------
-# * First time setup
-# * if [[ ! -d /var/www/html/igvdata ]]; then
-#     mkdir /var/www/html/igvdata
-#     sudo chgrp -R www-data /var/www/html/igvdata
-#     chmod -R 750 /var/www/html/igvdata
-#   fi
-# * setup security: see PIPELINE-1214
-#
-# * Add one project to the registry
-#   python dx-igv-registry.py -p <project_id> --seave -g GROUP_NAME
-# * Add all visible projects to the registry. Warning this may take a very long time
-#   python dx-igv-registry.py -u
-#
-# Follow the first time configuration below
-#
-# Usage for End Users wanting to use an XML
-# -----------------------------------------
-# The XML file contains URLs to all of the data within a DNAnexus project. These URLs are
-# pre-authenticated, ie you wont be asked for a password. So be careful
-# who you share this file with.
-#
-# You need to do some setup to create a simple HTTP server, so IGV can connect to
-# this DNAnexus data.
-#
-# * [[ -d ~/igvdata ]] || mkdir ~/igvdata
-# * put the xml file(s) in this folder
-# * create a txt file: ~/igvdata/1kg_v37_dataServerRegistry.txt, where each line
-#   is a valid URL, pointing to each of the xml files, for example:
-#   http://localhost:8000/igvdata/NEIWAT_Lung_Cancer_Project.xml
-#   If the filename has spaces or other characters in it, then they should the URL encoded, like this:
-#   http://localhost:8000/igvdata/Test%20IGV%20Server.xml
-#
-# * start an HTTP server:
-#   cd $HOME && python -m SimpleHTTPServer 8000
-# * open a new version of IGV (this works with >= 2.3.90) and configure it to use the local server:
-#   View > Preferences > Advanced > Edit Server Properties
-#   * Data Registry URL = http://localhost:8000/igvdata/$$_dataServerRegistry.txt
-#
-# * load your new data tracks: File > Load From Server...
-# You should only have to do this configuration once.
-# You should shutdown the SimpleHTTPServer when you are done (Ctrl-C).
-#
-# Next time you want to connect to the data:
-# * cd $HOME && python -m SimpleHTTPServer 8000
-# * open IGV, and load your new data: File > Load From Server...
+# See Readme.md, and Readme.Developer.md for more information
 #
 # Mark Cowley, 31/1/2017
 ##############################
@@ -462,6 +403,7 @@ def main(args):
                 args.igvdata = os.path.join(os.path.expanduser('~'), "igvdata")
                 args.url = 'https://localhost:8000/igvdata/'
         os.path.exists(args.igvdata) or os.mkdir(args.igvdata)
+        print("See Readme.Developer.md to set the permissions of this folder properly.")
     
         reg = IgvRegistry(ref_genome=args.ref_genome, folder=args.igvdata, url_root=args.url,
                           url_duration=args.duration, group=args.group)
@@ -489,7 +431,7 @@ if __name__ == '__main__':
                         default="1kg_v37")
     parser.add_argument('-g', '--group', help='Remote IGV server Group to associate data with', type=str,
                         required=False)
-    parser.add_argument('--xmlOnly', help='[Advanced] Only create an XML file', type=str, required=False)
+    parser.add_argument('--xmlOnly', help='[Advanced] Only create an XML file', action='store_true')
     parser.add_argument('--igvdata', help='[Advanced] Override the path to local igvdata', type=str, required=False)
     parser.add_argument('--url', help='[Advanced] Override the web accessible URL to igvdata', type=str, required=False)
     parser.add_argument('-t', '--test', help='Test mode, over a few projects only', action='store_true')
