@@ -14,6 +14,8 @@
 import argparse
 import glob
 import os
+import shutil
+import grp
 from urllib import quote
 from xml.etree.ElementTree import ElementTree, Element, SubElement, tostring
 import xml.dom.minidom
@@ -272,15 +274,29 @@ class IgvRegistry(object):
     def write_htaccess_file(self):
         assert self.group is not None
         htpasswd_path = '/home/ubuntu/.htpasswd_{}\n'.format(self.group)
-        p = os.path.join(self.folder, ".htaccess")
-        with open(p, 'w') as htaccess:
-            print("Initialising Apache folder-level security for " + p)
+        htaccess_path = os.path.join(self.folder, ".htaccess")
+        with open(htaccess_path, 'w') as htaccess:
+            print("Initialising Apache folder-level security for " + htaccess_path)
             htaccess.write('AuthUserFile ' + htpasswd_path)
             htaccess.write('AuthName "{}"\n'.format(self.group))
             htaccess.write('AuthType Basic\n')
             htaccess.write('Require valid-user\n')
+        print("Configured .htaccess security, within " + htaccess_path)
+
+        touch(htpasswd_path)
+        print("Configured empty .htpasswd file: " + htpasswd_path)
+        
+        # setup htpasswd file's security
+        # Alas, the ubuntu user is not a member of www-data...
+        # os.chown(htpasswd_path, -1, grp.getgrnam('www-data').gr_gid )
+        # os.chmod(htpasswd_path, 640)
+        print("Also, you'll need to set the group and permissions on the .htpasswd file:")
+        print("sudo chgrp www-data {}".format(htpasswd_path))
+        print("chmod 640 {}".format(htpasswd_path))
+
         print("You need to add username:password entries to " + htpasswd_path)
-        print("Visit http://www.kxs.net/support/ htaccess_pw.html to generate passwords")
+        print("Visit http://www.htaccesstools.com/htpasswd-generator/ to generate passwords")
+        
 
     def updateCache(self):
         manifests = []

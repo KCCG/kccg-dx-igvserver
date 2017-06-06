@@ -49,7 +49,7 @@ IGV setup is simple, and you only have to do this once:
   
 # IGV Usage:
   * open IGV, version 2.3.90 or newer
-  * File > Load from Server…
+  * File > Load from Server...
   * Enter your username + password
   * Select the appropriate data to load.
 
