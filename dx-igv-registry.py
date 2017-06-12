@@ -82,13 +82,15 @@ class DxDataset(object):
         subfolders = list(set(subfolders) - set(("metrics", "inputFastq", "reports")))
 
         for subfolder in subfolders:
-            subnode = SubElement(self.Global, "Category", name=subfolder)
+            subnode = SubElement(node, "Category", name=subfolder)
             subnodepath = str(folder + "/" + subfolder).replace("//", "/")
             self.addLevel(subnode, subnodepath)
 
         dxfiles = list(dxpy.find_data_objects(
             recurse=False, folder=folder, return_handler=True, project=self.project.get_id())
         )
+        dxfiles.sort(key=lambda x: x.name)
+
         for dxfile in dxfiles:
             if isinstance(dxfile, dxpy.DXFile):
                 # n, ext = os.path.splitext(dxfile.name)
@@ -125,7 +127,7 @@ class DxDataset(object):
         index = None
         for index_ext in index_exts:
             index_name = dxfile.name + "." + index_ext
-            print "Looking for index file: {}".format(index_name)
+            print("Looking for index file: {}".format(index_name))
             index = dxpy.find_one_data_object(
                 name=index_name, folder=folder, name_mode="exact", recurse=False,
                 project=self.project.get_id(), zero_ok=True, return_handler=True
@@ -164,26 +166,31 @@ class DxDataset(object):
                     duration=self.url_duration, preauthenticated=True, filename=name
                 )
                 resource.set("coverage", tdf_url[0])
+                # re-use this tdf URL, and add a separate element to the XML node
+                self.__addNonIndexedFile(tdf, folder=folder, node=node, file_url=tdf_url)
             else:
                 resource.set("coverage", ".")
         if "tbi" in index_exts:
             resource.set("mapping", ".")
 
-    def __addNonIndexedFile(self, dxfile, folder, node):
+    def __addNonIndexedFile(self, dxfile, folder, node, file_url=None):
         """
-        Add a file to XML tree, by generating a DX URL
+        Add a file to XML tree, by generating a DX URL.
         :param dxfile: DXFile object, point to a BAM, or VCF file
         :param folder: folder in which to find the index file
         :param node: Element or SubElement object
+        :param file_url: If you've already created a download URL for a file, then supply the URL. This allows a URL to
+        a coverage file (eg, TDF file) to be used both as a coverage file, and a stand-alone selectable file.
         :return: nothing
         """
         print("Adding {}:{}/{}".format(self.project.name, folder, dxfile.name))
         assert isinstance(dxfile, dxpy.DXFile)
 
         name = str(dxfile.name).replace("gvcf.gz", "g.vcf.gz").replace("merged.dedup.realigned.", "")
-        file_url = dxfile.get_download_url(
-            duration=self.url_duration, filename=name, preauthenticated=True
-        )
+        if file_url is None:
+            file_url = dxfile.get_download_url(
+                duration=self.url_duration, filename=name, preauthenticated=True
+            )
 
         resource = SubElement(node, "Resource")
         resource.set("name", dxfile.name)
