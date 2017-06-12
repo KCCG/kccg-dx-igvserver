@@ -150,8 +150,9 @@ class DxDataset(object):
         resource.set("path", file_url[0])
         resource.set("index", indel_url[0])
         if "bai" in index_exts:
-            tdf_names = [str(dxfile.name).replace(".bam", ".tdf"), dxfile.name + ".tdf"]
+            # then look for TDF coverage file as well
             tdf = None
+            tdf_names = [str(dxfile.name).replace(".bam", ".tdf"), dxfile.name + ".tdf"]
             for tdf_name in tdf_names:
                 print("Looking for tdf coverage file: {}".format(tdf_name))
                 tdf = dxpy.find_one_data_object(
@@ -160,12 +161,12 @@ class DxDataset(object):
                 )
                 if tdf:
                     break
-            if tdf is not None:
-                name = str(tdf.name).replace("gvcf.gz", "g.vcf.gz").replace("merged.dedup.realigned.", "")
+            if tdf:
                 tdf_url = tdf.get_download_url(
-                    duration=self.url_duration, preauthenticated=True, filename=name
+                    duration=self.url_duration, preauthenticated=True, filename=tdf.name
                 )
                 resource.set("coverage", tdf_url[0])
+                resource.set("name", dxfile.name + " (+ tdf)")
                 # re-use this tdf URL, and add a separate element to the XML node
                 self.__addNonIndexedFile(tdf, folder=folder, node=node, file_url=tdf_url)
             else:
