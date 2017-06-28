@@ -7,16 +7,13 @@ Each XML file contains hyperlinks to genomic data on DNAnexus. As such, these UR
 # Adding XML manifests to the server (local machine, or seave.bio)
 * Add an XML to the registry
 
-
     dx-igv-registry.py -p $project_id
 
 * Add an XML to the registry, for a certain group, where URLs expire after 1 month (31*24*3600 seconds)
 
-
     dx-igv-registry.py -p $project_id -g LKCGP -d 2678400
 
 * Add all XMLs from a group to the registry
-
 
     for project_id in $(dx find projects --tag LKCGP --brief); do 
         dx-igv-registry.py -p $project_id -g LKCGP
@@ -48,7 +45,7 @@ Setup is simple, and you only have to do this once:
 
 ## Getting Access
 If you’d like access, please choose a username + password, then visit http://www.kxs.net/support/htaccess_pw.html, 
-enter this information, and let Mark, or Vel know.
+enter this information, and let Mark C, or Vel know.
 
 # Installation
 * See Readme.Developer.md for instructions on how to install this application, and how to setup an IGV server.
@@ -56,10 +53,10 @@ enter this information, and let Mark, or Vel know.
 # Administration
 * To add a project to the server:
 
-
     ./dx-igv-registry.py -p $project_id -g LKCGP
+
 * To add many projects to the server:
 
-
     for project_id in $(dx find projects --tag LKCGP --brief); do ./dx-igv-registry.py -p $project_id -g LKCGP; done
+
 * See Readme.Developer.md for more info.
