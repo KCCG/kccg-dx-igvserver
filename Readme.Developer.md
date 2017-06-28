@@ -1,18 +1,21 @@
 # Overview
-Once you have installed, setup, or configured your IGV server, then adding an XML manigest to a project is simple:
+Once you have installed, setup, or configured your IGV server, then adding an XML manifest to a project is simple:
 * Add an XML to the registry, for a certain group
-
 
     dx-igv-registry.py -p $project_id -g LKCGP
 
-* Add all XMLs from a group to the registry
+* Add an XML to the registry, for mm10 reference genome
 
+    dx-igv-registry.py -p $project_id -g NEIWAT -r mm10
+
+* Add all XMLs from a group to the registry
 
     for project_id in $(dx find projects --tag LKCGP --brief); do 
         dx-igv-registry.py -p $project_id -g LKCGP
     done
 
 ## additional options
+
     $ dx-igv-registry.py -h
     usage: dx-igv-registry.py [-h] [-p PROJECT_ID] [-d DURATION] [-r REF_GENOME]
                               [-g GROUP] [--xmlOnly XMLONLY] [--igvdata IGVDATA]
@@ -41,17 +44,17 @@ Once you have installed, setup, or configured your IGV server, then adding an XM
 
 # IGV setup
 IGV setup is simple, and you only have to do this once:
-  * open IGV, version 2.3.90 or newer
-  * View > Preferences > Advanced
-  * set Data Registry URL = https://seave.bio/igvdata/LKCGP/$$_dataServerRegistry.txt
-  * Hit OK
-  * Ensure that your reference genome is “Human (1kg, b37+decoy)”
+  # open IGV, version 2.3.90 or newer
+  # View > Preferences > Advanced
+  # set Data Registry URL = https://seave.bio/igvdata/LKCGP/$$_dataServerRegistry.txt
+  # Hit OK
+  # Ensure that your reference genome is "Human (1kg, b37+decoy)", or mm10 if appropriate. ie not hg19, or b37
   
 # IGV Usage:
-  * open IGV, version 2.3.90 or newer
-  * File > Load from Server...
-  * Enter your username + password
-  * Select the appropriate data to load.
+  # open IGV, version 2.3.90 or newer
+  # File > Load from Server...
+  # Enter your username + password
+  # Select the appropriate data to load.
 
 
 There are a number of common usage scenarios:
@@ -74,8 +77,8 @@ There are a number of common usage scenarios:
 * This works on OSX, and should work on Linux
 * open Terminal app & type
 
-
     cd $HOME && python -m SimpleHTTPServer 8000
+
 * You can terminate this process at any time via Ctrl-C
 
 ## Install the XML files
@@ -83,7 +86,6 @@ There are a number of common usage scenarios:
 * Create a txt file called ~/igvdata/1kg_v37_dataServerRegistry.txt
 * Add URLs to each of the XML files within that directory.
 * Heres some examples
-
 
     http://localhost:8000/igvdata/170505_NS500817_0171_AHKWKLBGX2.xml
     http://localhost:8000/igvdata/20161024_MoST.xml
@@ -111,7 +113,6 @@ There are a number of common usage scenarios:
 
 ## setup web-accessible location
 * on seave.bio, this is /var/www/html/igvdata 
-
 
     if [[ ! -d /var/www/html/igvdata ]]; then
       mkdir /var/www/html/igvdata
