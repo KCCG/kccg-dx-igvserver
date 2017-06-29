@@ -44,7 +44,7 @@ Setup is simple, and you only have to do this once:
 * You can load the reads when you need them by right clicking the coverage track, and then ‘load alignments’
 
 ## Getting Access
-If you’d like access, please choose a username + password, then visit http://www.kxs.net/support/htaccess_pw.html, 
+If you’d like access, please choose a username + password, then visit http://www.htaccesstools.com/htpasswd-generator/,
 enter this information, and let Mark C, or Vel know.
 
 # Installation
