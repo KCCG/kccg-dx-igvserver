@@ -416,10 +416,10 @@ def main(args):
         """Create an XML manifest, and add it to an Igv Data Server registry"""
         hostname = socket.gethostname()
         if not args.igvdata_path or not args.igvdata_url:
-            if hostname == 'ip-172-31-59-137':
+            if hostname == 'ip-172-31-18-95':
                 args.igvdata_url = 'https://seave.bio/igvdata'
                 args.igvdata_path = '/var/www/html/igvdata/'
-            elif hostname == 'ip-172-31-50-139':
+            elif hostname == 'ip-172-31-11-39':
                 args.igvdata_url = 'https://dev.seave.bio/igvdata'
                 args.igvdata_path = '/var/www/html/igvdata/'
             else:
