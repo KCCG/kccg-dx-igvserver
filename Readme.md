@@ -4,6 +4,9 @@ run on your localhost, or on Apache server (eg seave.bio).
 An IGV Data Server is simply an HTTP server, hosting a web-accessible TXT file, which contains hyperlinks to XML files. 
 Each XML file contains hyperlinks to genomic data on DNAnexus. As such, these URLs will expire (default 1 year).
 
+We use tags to link DNAnexus projects to specific research groups (eg LKCGP, MoST), and then organise the data
+together into one subfolder per group in the IGV server.
+ 
 # Adding XML manifests to the server (local machine, or seave.bio)
 * Add an XML to the registry
 
