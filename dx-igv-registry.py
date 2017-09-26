@@ -417,17 +417,19 @@ def main(args):
         hostname = socket.gethostname()
         if not args.igvdata_path or not args.igvdata_url:
             if hostname == 'ip-172-31-18-95':
+                print("Running on seave.bio")
                 args.igvdata_url = 'https://seave.bio/igvdata'
                 args.igvdata_path = '/var/www/html/igvdata/'
             elif hostname == 'ip-172-31-11-39':
+                print("Running on dev.seave.bio")
                 args.igvdata_url = 'https://dev.seave.bio/igvdata'
                 args.igvdata_path = '/var/www/html/igvdata/'
             else:
+                print("This isn't running on a Seave server, so defaulting to localhost")
                 # args.igvdata_path = '~/var/www/html/igvdata'  # local testing of Seave mode
                 args.igvdata_path = os.path.join(os.path.expanduser('~'), "igvdata")
                 args.igvdata_url = 'https://localhost:8000/igvdata/'
         os.path.exists(args.igvdata_path) or os.mkdir(args.igvdata_path)
-        print("See Readme.Developer.md to set the permissions of this folder properly.")
 
         reg = IgvRegistry(ref_genome=args.ref_genome, folder=args.igvdata_path, url_root=args.igvdata_url,
                           url_duration=args.duration, group=args.group)
